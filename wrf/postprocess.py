@@ -232,7 +232,7 @@ def main():
     ap.add_argument("--pilota", default="ecmwf", choices=["ecmwf", "gfs"], help="modello globale usato, solo per il titolo")
     ap.add_argument("--n", type=int, default=80, help="punti per lato della griglia delle mappe")
     ap.add_argument("--senza-stazioni", action="store_true")
-    ap.add_argument("--max-stazioni", type=int, default=60)
+    ap.add_argument("--max-stazioni", type=int, default=100000, help="default: tutte")
     ap.add_argument("--senza-orarie", action="store_true", help="non disegnare le immagini orarie (una per ora e variabile)")
     ap.add_argument("--da-ora", default="", help="ora locale ISO da cui partire (default: l'ora attuale)")
     a = ap.parse_args()

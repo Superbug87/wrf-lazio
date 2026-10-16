@@ -95,10 +95,34 @@ EOF
 passo "file WRF e geo_em inventati"
 python3 wrf/prova_sintetica.py --out "$T/sint" --geo "$T/geo"
 
-passo "stazioni per il nudging (inventate) e rilettura con i formati di WRF"
+passo "tutte le stazioni: ricerca a riquadri senza perdite, controllo di qualità con guasti inventati, rilettura con i formati di WRF"
 python3 wrf/stazioni_wrf.py --prova --ciclo 2026101600 --geo "$T/geo" --out "$T/obs"
 gfortran wrf/leggi_obs.f90 -o "$T/leggi_obs"
 for f in "$T"/obs/OBS_DOMAIN101 "$T"/obs/OBS_DOMAIN201 "$T"/obs/OBS_DOMAIN301; do "$T/leggi_obs" "$f"; done
+
+passo "ricerca e lettura delle stazioni usate dalle mappe (API inventata, tutte le stazioni, in parallelo)"
+python3 - "$T" <<'EOF'
+import sys
+from datetime import datetime, timezone
+sys.path.insert(0, "wrf"); sys.path.insert(0, ".")
+import previsioni_lazio as pc
+import stazioni_wrf as sw
+dom = sw.carica_domini(sys.argv[1] + "/geo")
+api = sw.ApiFinta(dom, datetime.now(timezone.utc))
+sw.wu_get = api
+trovate = pc.cerca_stazioni("finta")
+dentro = sum(1 for la, lo in api.pos if pc.LAT_MIN <= la <= pc.LAT_MAX and pc.LON_MIN <= lo <= pc.LON_MAX)
+assert dentro > 500 and len(trovate) >= 0.995 * dentro, (dentro, len(trovate))
+def finto(url, params, validita):
+    if params["stationId"].endswith("7"):
+        raise KeyError("niente")
+    return {"observations": [{"lat": 41.7, "lon": 12.7, "obsTimeLocal": "2026-10-16 12:00:00", "metric": {"elev": 100, "temp": 18.2, "dewpt": 9.0}}]}
+pc._get_json = finto
+ids = [f"IF{i:05d}" for i in range(200)]
+oss = pc.leggi_stazioni("finta", ids)
+assert len(oss) == sum(1 for i in ids if not i.endswith("7")), len(oss)
+print(f"mappe: {len(trovate)} stazioni trovate su {dentro} nel riquadro, {len(oss)} lette su {len(ids)}")
+EOF
 
 passo "temperatura del mare: formato intermedio di WPS riletto"
 python3 - "$T" <<'EOF'

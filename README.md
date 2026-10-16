@@ -30,7 +30,7 @@ metgrid, real, segmenti e pubblicazione sono gli stessi. Questo repository è **
 | passo di calcolo | 45 s (nidi: 15 s e 5 s) | 144 s (nidi: 48 s e 16 s) |
 | convezione | esplicita da 3 km in giù | Kain-Fritsch a 27 e 9 km, esplicita a 3 km |
 | mappe | 40 x 40 km, passo ~1 km | 256 x 256 km (40,67-42,97 N, 11,18-14,26 E), passo ~3 km |
-| stazioni nel nudging | fino a 40 / 30 / 20 | fino a 50 / 20 / 10 (la chiave Wunderground è la stessa e ha un limite giornaliero) |
+| stazioni nel nudging | fino a 40 / 30 / 20 | **tutte** quelle trovate nell'area del dominio a 3 km (in una prova ne ha trovate circa 2100; quante restano dopo i controlli lo dice il log), nessun tetto |
 | raggio del nudging | 100 / 50 / 25 km | 200 / 100 / 50 km |
 | temperatura del mare (MUR) | 1 km, 39-44,5 N 9-16,5 E | un punto ogni 2 km, 35,5-48 N 4-21,5 E |
 | radar | un pixel ogni punto della mappa | media dei pixel da 1 km attorno a ogni punto da 3 km |
@@ -55,8 +55,8 @@ temporali sono meno nitidi. Per il dettaglio sui Castelli resta il progetto geme
    MUR, sì di default), `radar` (confronto con il radar e pioggia delle prossime 3 ore, sì di default).
 3. **L'avvio automatico è spento** (righe `schedule` commentate in `.github/workflows/wrf.yml`) finché non c'è una prima
    esecuzione completa riuscita. Poi si tolgono i `#`: 09:10 UTC (ciclo ECMWF delle 00 UTC, pubblicato verso le 07:35) e
-   20:20 UTC (ciclo delle 12 UTC, verso le 19:35). Gli orari sono sfalsati di mezz'ora rispetto ai Castelli perché le due
-   catene usano la stessa chiave Wunderground (30 chiamate al minuto).
+   20:20 UTC (ciclo delle 12 UTC, verso le 19:35). Gli orari sono sfalsati di mezz'ora rispetto ai Castelli: le due catene
+   usano la stessa chiave Wunderground e così non chiamano insieme.
 
 Tempi **stimati** (non ancora misurati qui; la compilazione e i dati statici sono quelli dei Castelli, il calcolo no):
 
@@ -65,7 +65,7 @@ Tempi **stimati** (non ancora misurati qui; la compilazione e i dati statici son
 | compilazione di WRF e WPS | solo la prima volta | 40-90 min |
 | dati statici (terreno, uso del suolo) | solo la prima volta | 30-60 min (il dominio esterno è 8 volte più esteso: forse di più) |
 | scarico ECMWF, ungrib, metgrid, real | ogni giorno | 10-20 min |
-| stazioni Wunderground (ricerca e lettura) | ogni giorno | 10-15 min |
+| stazioni Wunderground (ricerca e lettura, in parallelo) | ogni giorno | circa 3 min (misurato: 30 s di ricerca e 100 s di lettura per ~2100 stazioni) |
 | WRF, 3 segmenti da 16 h in fila | ogni giorno | 1-2 h ciascuno |
 | mappe e pubblicazione | ogni giorno | 5-10 min |
 
@@ -100,22 +100,33 @@ Le uscite del dominio a 3 km pesano circa tre volte quelle dei Castelli (stima: 
 
 ## Cosa fa e cosa non fa
 - WRF è alimentato da un solo modello globale per volta (ECMWF o GFS).
-- **Stazioni Wunderground dentro WRF (nudging).** Con la chiave `WU_API_KEY`, prima del calcolo si cercano le
-  stazioni nei tre domini (su una griglia di punti: ogni 0,35° nel dominio a 3 km, 0,8° in quello a 9 km, 2° in quello a 27 km),
-  se ne scelgono fino a 50 nel dominio a 3 km, 20 in quello a 9 km e 10 in quello a 27 km (le più distanziate tra loro),
-  se ne scarica lo storico delle ultime 24 ore, si controllano (valori plausibili, quota dichiarata coerente con il
-  terreno del modello entro 400/600/800 m nei tre domini, scarto dalle stazioni vicine riportate alla stessa quota) e si mediano ogni 15 minuti.
-  WRF, dall'inizio del ciclo fino all'ultima osservazione, spinge temperatura e umidità verso quei valori
-  (raggio di influenza 200/100/50 km nei tre domini, tempo di rilassamento circa mezz'ora); poi prosegue libero
-  dallo stato raggiunto. Il **vento delle stazioni non viene usato**: gli anemometri amatoriali sono quasi sempre
-  riparati. Senza chiave o senza dati utili WRF gira senza nudging. In questo caso le mappe applicano come prima
-  la correzione dopo il calcolo (scala 5 km, 8 x 8 punti di ricerca); con il nudging non si corregge una seconda volta.
-  Limiti: i sensori amatoriali sono di qualità diversa (quelli al sole di giorno scaldano) e l'effetto sulle ore
-  lontane dall'ultima osservazione è piccolo: il nudging migliora lo stato di partenza, non cancella gli errori del
-  modello globale. Assimilare le stazioni con un'analisi vera (WRFDA) sarebbe un lavoro a parte.
-  **Limite della chiave**: Wunderground concede circa 1500 chiamate al giorno e 30 al minuto per chiave. Ogni ciclo ne usa
-  circa 300, due cicli al giorno circa 600; il progetto dei Castelli usa la stessa chiave. Non lanciare molte
-  esecuzioni a mano nello stesso giorno.
+- **Stazioni Wunderground dentro WRF (nudging).** Con la chiave `WU_API_KEY`, prima del calcolo si cercano **tutte** le
+  stazioni nell'area del dominio a 3 km (il Lazio più un margine attorno). Ogni ricerca ne dà al massimo 10, quindi l'area si
+  divide in riquadri e ogni riquadro in cui le 10 stazioni più vicine non bastano a coprirlo si divide ancora, fino a riquadri
+  di mezzo km nei centri abitati; le ricerche e le letture girano in parallelo (24 alla volta, al massimo 40 chiamate al
+  secondo). Di ogni stazione si legge la posizione/quota attuale e lo storico delle ultime 24 ore. Poi si **scartano quelle
+  con dati sballati**: mute da più di 3 ore, quota dichiarata incoerente con il terreno del modello (oltre 400/600/800 m nei tre
+  domini), senza temperatura, con il sensore bloccato (temperatura identica per 3 ore) o con più della metà dei valori fuori
+  dalle vicine. I valori si confrontano con quelli delle 12 stazioni più vicine, riportati alla stessa quota (6,5 K/km): fuori
+  se si discostano dalla loro mediana più di 3 volte lo scarto tipico e più di una soglia minima (temperatura 3-8 K, umidità
+  25-40 %, pressione 2-4 hPa, crescente con la distanza delle vicine); si tolgono anche i salti improvvisi nel tempo. La
+  pressione sbagliata (di solito quella non riportata al mare) si toglie da sola, senza eliminare la stazione. Nel collaudo
+  con dati veri (1781 stazioni, 9 ore di dati, terreno inventato) sono stati scartati circa il 2 % delle temperature, lo 0,6 % delle umidità e l'11 % delle pressioni.
+  Il resto si media ogni 15 minuti. WRF, dall'inizio del ciclo fino all'ultima osservazione, spinge temperatura e umidità
+  verso quei valori (raggio di influenza 200/100/50 km nei tre domini, tempo di rilassamento circa mezz'ora); poi prosegue
+  libero dallo stato raggiunto. Il **vento delle stazioni non viene usato**: gli anemometri amatoriali sono quasi sempre
+  riparati. Senza chiave o senza dati utili WRF gira senza nudging. In questo caso le mappe applicano la correzione
+  dopo il calcolo (scala 5 km), sempre con tutte le stazioni del riquadro; con il nudging non si corregge una seconda volta.
+  Limiti: i sensori amatoriali sono di qualità diversa (quelli al sole di giorno scaldano), nei centri abitati le stazioni
+  sono centinaia e pesano molto sul risultato locale, e l'effetto sulle ore lontane dall'ultima osservazione è piccolo: il
+  nudging migliora lo stato di partenza, non cancella gli errori del modello globale. I file delle osservazioni crescono
+  (circa 75 MB in chiaro per ciclo, circa 7 MB compressi e cifrati tra un segmento e l'altro). Assimilare le stazioni con
+  un'analisi vera (WRFDA) sarebbe un lavoro a parte.
+  **Chiamate**: ogni ciclo ne usa circa 4000 (1150 per la ricerca, 2 per stazione per la lettura), due cicli al giorno circa
+  8000, più il flusso dei Castelli con la stessa chiave. Wunderground dichiara per le chiavi personali 1500 chiamate al giorno
+  e 30 al minuto; nelle prove (circa 5000 chiamate in una sera, fino a 80 al secondo) non ha mai rifiutato nulla. Se un giorno
+  rifiutasse ("troppe richieste") più volte di fila, il programma smette di chiamare e usa le stazioni già lette, senza fallire.
+  Si regola con `WU_CHIAMATE_AL_SECONDO` (default 40) e `WU_THREAD` (default 24).
 - **Temperatura del mare.** ECMWF dà la temperatura del mare a 25 km. Per il mare si scarica l'analisi MUR SST di NASA JPL
   (0,01°, circa 1 km, qui diradata a un punto ogni 0,02°, con 1-2 giorni di ritardo, tenuta costante per le 48 ore) e WRF la usa sui punti d'acqua
   al posto di quella del modello globale. Il riquadro scaricato copre tutto il dominio a 27 km.
@@ -182,7 +193,7 @@ Queste prove girano da sole a ogni modifica del codice: `wrf/prove.sh`, lanciato
 
 **Non provato in questo repository:** compilazione di WRF e WPS, download dei dati geografici NCAR, geogrid sul nuovo dominio
 (1296 km a 27 km: più grande di quello dei Castelli), metgrid con il riquadro MUR esteso, real.exe e wrf.exe a 144 s
-(stabilità numerica e tempi di calcolo da misurare), nudging con 80 stazioni e raggi 200/100/50 km, uscite da circa 1,5 GB
+(stabilità numerica e tempi di calcolo da misurare), nudging con oltre 1600 stazioni e raggi 200/100/50 km (file delle osservazioni grandi), uscite da circa 1,5 GB
 per segmento, pagina del sito con dati veri. Le scelte fisiche (Kain-Fritsch a 9 km, radiazione ogni 30/10/5 minuti, nessun
 `slope_rad`) sono ragionevoli ma non tarate. Il primo avvio potrebbe richiedere qualche correzione: i log escono come artifact.
 

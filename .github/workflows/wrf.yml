@@ -3,7 +3,7 @@ name: Previsione WRF Lazio
 on:
   # Avvio automatico SPENTO finché non c'è una prima esecuzione completa riuscita (compilazione, geogrid e segmenti mai
   # provati in questo repository). Poi si tolgono i "#". Gli orari sono sfalsati di mezz'ora rispetto al flusso dei
-  # Castelli Romani (08:40 e 19:50) perché i due usano la stessa chiave Wunderground (30 chiamate al minuto).
+  # Castelli Romani (08:40 e 19:50): usano la stessa chiave Wunderground e così non chiamano insieme.
   # schedule:
   #   - cron: "10 9 * * *"         # ogni giorno alle 09:10 UTC: il ciclo ECMWF delle 00 UTC è pubblicato verso le 07:35
   #   - cron: "20 20 * * *"        # e alle 20:20 UTC: il ciclo delle 12 UTC è pubblicato verso le 19:35 (se non c'è ancora si usa l'ultimo completo)

@@ -32,8 +32,10 @@ import os
 import re
 import sys
 import textwrap
+import threading
 import time
-from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import matplotlib
@@ -107,7 +109,20 @@ CACHE = Path(".cache_open_meteo")
 URL_VICINE = "https://api.weather.com/v3/location/near"
 URL_STAZIONE = "https://api.weather.com/v2/pws/observations/current"
 SEGRETI = []          # chiavi API da nascondere nei messaggi d'errore
-_sessione = None      # una connessione riusata è più stabile di tante nuove
+_locale = threading.local()      # una connessione riusata è più stabile di tante nuove (una per thread)
+_wu_lucchetto = threading.Lock()
+_wu_prossimo = [0.0]
+WU_AL_SECONDO = float(os.environ.get("WU_CHIAMATE_AL_SECONDO", "40"))
+
+
+def _attendi_wu():
+    """Distanzia le chiamate a Wunderground di tutti i thread insieme (al massimo WU_AL_SECONDO al secondo)."""
+    with _wu_lucchetto:
+        ora = time.monotonic()
+        inizio = max(ora, _wu_prossimo[0])
+        _wu_prossimo[0] = inizio + 1.0 / WU_AL_SECONDO
+    if inizio > ora:
+        time.sleep(inizio - ora)
 VARIABILI = ("temperature_2m,dew_point_2m,pressure_msl,precipitation,wind_speed_10m,wind_direction_10m,cape,"
              "wind_gusts_10m,temperature_850hPa")
 
@@ -125,24 +140,23 @@ def _pulisci(testo):
 
 def _get(url, params, tentativi=5):
     """GET con pazienza: se Open-Meteo risponde 429 (troppe richieste) o 5xx aspetta e riprova."""
-    global _sessione
     import requests
 
     for i in range(tentativi):
+        if "weather.com" in url:
+            _attendi_wu()
         try:
-            if _sessione is None:
-                _sessione = requests.Session()
-            r = _sessione.get(url, params=params, timeout=60)
+            if getattr(_locale, "sessione", None) is None:
+                _locale.sessione = requests.Session()
+            r = _locale.sessione.get(url, params=params, timeout=60)
         except requests.exceptions.ConnectionError:
-            _sessione = None
+            _locale.sessione = None
             if i == tentativi - 1:
                 raise
             attesa = 5 * (i + 1)
             print(f"Connessione fallita, riprovo tra {attesa} s...", file=sys.stderr)
             time.sleep(attesa)
             continue
-        if "weather.com" in url:
-            time.sleep(2.1)                      # Wunderground: massimo 30 richieste al minuto
         if r.status_code in (429, 500, 502, 503, 504) and i < tentativi - 1:
             attesa = int(r.headers.get("Retry-After", 0) or 0) or 15 * (i + 1)
             print(f"Il servizio risponde {r.status_code}, riprovo tra {attesa} s...", file=sys.stderr)
@@ -238,20 +252,23 @@ def quote_reali(lat_f, lon_f):
 # Stazioni Weather Underground: la "situazione attuale" per correggere il modello
 # La chiave si legge dalla variabile d'ambiente WU_API_KEY (mai scritta nei file)
 # ----------------------------------------------------------------------------
-def cerca_stazioni(chiave, per_lato=8):
-    """Ogni ricerca restituisce al massimo 10 stazioni: si ripete da una griglia di punti."""
-    trovate = {}
-    for la in np.linspace(LAT_MIN + 0.04, LAT_MAX - 0.04, per_lato):
-        for lo in np.linspace(LON_MIN + 0.05, LON_MAX - 0.05, per_lato):
-            p = {"geocode": f"{la:.4f},{lo:.4f}", "product": "pws", "format": "json", "apiKey": chiave}
-            try:
-                loc = _get_json(URL_VICINE, p, validita=86400)["location"]       # elenco valido 1 giorno
-            except (KeyError, ValueError):
-                continue
-            for sid, sla, slo in zip(loc["stationId"], loc["latitude"], loc["longitude"]):
-                if sid and LAT_MIN <= sla <= LAT_MAX and LON_MIN <= slo <= LON_MAX:
-                    trovate[sid] = (float(sla), float(slo))
-    return trovate
+def cerca_stazioni(chiave):
+    """Tutte le stazioni Wunderground nel riquadro delle mappe. Ogni ricerca ne dà al massimo 10: si divide il riquadro
+    in parti e si suddivide ancora dove le 10 più vicine non bastano (la procedura è in wrf/stazioni_wrf.py)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent / "wrf"))
+    import stazioni_wrf as sw
+
+    class Riquadro:
+        lat = np.array([LAT_MIN, LAT_MAX])
+        lon = np.array([LON_MIN, LON_MAX])
+
+        @staticmethod
+        def contiene(la, lo):
+            return LAT_MIN <= la <= LAT_MAX and LON_MIN <= lo <= LON_MAX
+
+    sw.SEGRETI.extend(SEGRETI)
+    trovate, _ = sw.cerca(chiave, {3: Riquadro}, datetime.now(timezone.utc))
+    return {sid: pos for sid, pos in trovate.items() if Riquadro.contiene(*pos)}
 
 
 def diradamento(stazioni, massimo):
@@ -272,23 +289,24 @@ def diradamento(stazioni, massimo):
 
 
 def leggi_stazioni(chiave, ids):
-    """Ultima osservazione di ogni stazione (risposta tenuta in cache per 5 minuti)."""
+    """Ultima osservazione di ogni stazione (risposta tenuta in cache per 5 minuti), con molte chiamate in parallelo."""
     import requests
 
-    oss = {}
-    for sid in ids:
+    def una(sid):
         p = {"stationId": sid, "format": "json", "units": "m", "numericPrecision": "decimal", "apiKey": chiave}
         try:
             o = _get_json(URL_STAZIONE, p, validita=300)["observations"][0]
             m = o["metric"]
-            oss[sid] = {
+            return sid, {
                 "lat": float(o["lat"]), "lon": float(o["lon"]), "quota": m.get("elev"),
                 "ora": datetime.strptime(o["obsTimeLocal"], "%Y-%m-%d %H:%M:%S"),
                 "T": m.get("temp"), "Td": m.get("dewpt"),
             }
         except (KeyError, IndexError, ValueError, TypeError, requests.RequestException):
-            continue                                   # stazione senza dati o che non risponde
-    return oss
+            return sid, None                           # stazione senza dati o che non risponde
+
+    with ThreadPoolExecutor(int(os.environ.get("WU_THREAD", "24"))) as pool:
+        return {sid: o for sid, o in pool.map(una, list(ids)) if o is not None}
 
 
 def _filtra(valori):
@@ -949,7 +967,7 @@ def main():
     ap.add_argument("--inizio", default=None, help="solo con --simula: ora di partenza ISO, es. 2026-10-16T08:00")
     ap.add_argument("--out", default="output", help="cartella di destinazione delle immagini")
     ap.add_argument("--senza-stazioni", action="store_true", help="non usare le stazioni Wunderground")
-    ap.add_argument("--max-stazioni", type=int, default=60, help="massimo di stazioni Wunderground da leggere")
+    ap.add_argument("--max-stazioni", type=int, default=100000, help="massimo di stazioni Wunderground da leggere (default: tutte)")
     a = ap.parse_args()
 
     global N_GROSSA
