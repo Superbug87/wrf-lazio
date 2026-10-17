@@ -53,10 +53,10 @@ temporali sono meno nitidi. Per il dettaglio sui Castelli resta il progetto geme
 2. Campi: `pilota` (`ecmwf` di default, oppure `gfs`), `ciclo` (vuoto = l'ultimo completo; per ECMWF solo le 00 e le 12 UTC),
    `ore` (default 48), `ore_segmento` (default 16), `stazioni` (nudging, sì di default), `mare` (temperatura del mare
    MUR, sì di default), `radar` (confronto con il radar e pioggia delle prossime 3 ore, sì di default).
-3. **L'avvio automatico è spento** (righe `schedule` commentate in `.github/workflows/wrf.yml`) finché non c'è una prima
-   esecuzione completa riuscita. Poi si tolgono i `#`: 09:10 UTC (ciclo ECMWF delle 00 UTC, pubblicato verso le 07:35) e
-   20:20 UTC (ciclo delle 12 UTC, verso le 19:35). Gli orari sono sfalsati di mezz'ora rispetto ai Castelli: le due catene
-   usano la stessa chiave Wunderground e così non chiamano insieme.
+3. **L'avvio automatico è attivo** (righe `schedule` in `.github/workflows/wrf.yml`, dopo la prima esecuzione completa
+   riuscita del 16-17 ottobre 2026, circa 2 h 30): 09:10 UTC (ciclo ECMWF delle 00 UTC, pubblicato verso le 07:35) e
+   20:20 UTC (ciclo delle 12 UTC, verso le 19:35). Per spegnerlo basta commentare di nuovo quelle righe. Gli orari sono
+   sfalsati di mezz'ora rispetto ai Castelli: le due catene usano la stessa chiave Wunderground e così non chiamano insieme.
 
 Tempi **stimati** (non ancora misurati qui; la compilazione e i dati statici sono quelli dei Castelli, il calcolo no):
 
@@ -168,6 +168,7 @@ Le uscite del dominio a 3 km pesano circa tre volte quelle dei Castelli (stima: 
 | Radar (facoltativo) | [Radar-DPC](https://radar.protezionecivile.it), Dipartimento della Protezione Civile, mosaico nazionale SRI (intensità di pioggia) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/): va citata la fonte e le immagini ricavate (`radar_*`) hanno la stessa licenza. Dati usati solo per le due immagini radar, non ripubblicati in forma grezza; il CSV contiene solo medie sull'area |
 | Modello | [WRF e WPS](https://www2.mmm.ucar.edu/wrf/users/public.html) di NCAR/UCAR | software pubblico, non incluso qui: lo compila il flusso di lavoro dai sorgenti ufficiali |
 | Terreno e uso del suolo | dati geografici [WPS_GEOG](https://www2.mmm.ucar.edu/wrf/users/download/get_sources_wps_geog.html) di NCAR/UCAR (tra cui GMTED2010 di USGS/NGA e MODIS) | scaricati durante il calcolo, non inclusi qui; vale la licenza di ciascun dato |
+| Confini regionali e provinciali | confini amministrativi ISTAT, elaborati da [Openpolis](https://github.com/openpolis/geojson-italy) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)) | semplificati (100 m) e ritagliati sull'area delle mappe in `dati/confini_lazio.json`; la fonte è citata a piè di mappa |
 | Stazioni meteo | rete di stazioni amatoriali di [Weather Underground](https://www.wunderground.com/) (The Weather Company), tramite la chiave personale del proprietario | restano soggette ai termini d'uso di Weather Underground, da rispettare (la chiave è personale). I dati **non vengono ripubblicati**: si scaricano durante il calcolo, entrano in WRF e non finiscono nei risultati; i file temporanei che passano da un segmento all'altro sono cifrati; i log non riportano codici o posizioni delle stazioni; le mappe mostrano solo l'uscita del modello |
 | Solo per `previsioni_lazio.py` usato da solo | [Open-Meteo](https://open-meteo.com/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); l'API gratuita è per uso non commerciale) e quote dal modello digitale del terreno Copernicus DEM («contiene dati Copernicus modificati») | non usati dalla catena WRF |
 
@@ -198,7 +199,7 @@ per segmento, pagina del sito con dati veri. Le scelte fisiche (Kain-Fritsch a 9
 `slope_rad`) sono ragionevoli ma non tarate. Il primo avvio potrebbe richiedere qualche correzione: i log escono come artifact.
 
 ## File
-- `.github/workflows/wrf.yml` — il flusso (a mano finché non si attiva l'avvio automatico)
+- `.github/workflows/wrf.yml` — il flusso (automatico alle 09:10 e 20:20 UTC, o a mano)
 - `wrf/dominio.py` — geometria dei tre domini · `wrf/config.py` — namelist di WPS e WRF
 - `wrf/dipendenze.sh`, `costruisci.sh` (a tappe, con avanzamento e guardiano), `statico.sh`, `esegui.sh`, `pubblica.sh`
 - `wrf/scarica_ecmwf.py` + `wrf/Vtable.ECMWF_OD` — dati ECMWF · `wrf/scarica_gfs.py` — alternativa GFS
@@ -213,3 +214,5 @@ per segmento, pagina del sito con dati veri. Le scelte fisiche (Kain-Fritsch a 9
   avanzamento, tempo massimo e guardiano della compilazione con comandi inventati
 - `.github/workflows/prova.yml` — prova automatica a ogni modifica · `.github/workflows/sito.yml` — carica la pagina sul sito
 - `previsioni_lazio.py` — mappe e correzione con le stazioni (usato da `postprocess.py`)
+- `dati/confini_lazio.json` — confine del Lazio e confini provinciali disegnati sulle mappe (linea spessa il Lazio, più
+  sottili le province) · `wrf/prepara_confini.py` — lo rifà dai confini ISTAT di Openpolis (serve solo se cambiano)

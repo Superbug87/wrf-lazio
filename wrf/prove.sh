@@ -65,6 +65,35 @@ assert pc.LAT_MIN < 40.78 and pc.LAT_MAX > 42.85 and pc.LON_MIN < 11.45 and pc.L
 print("mappe e dominio ok")
 EOF
 
+passo "confini del Lazio e delle province: le città del Lazio dentro, quelle vicine fuori, cinque province"
+python3 - <<'EOF'
+import json, sys
+sys.path.insert(0, ".")
+import numpy as np
+from matplotlib.path import Path
+import previsioni_lazio as pc
+d = json.load(open("dati/confini_lazio.json"))
+assert d["regione"] and "CC BY" in d["fonte"], "file dei confini incompleto"
+nel = sorted(p["nome"] for p in d["province"] if p["regione"] == "Lazio")
+assert nel == ["Frosinone", "Latina", "Rieti", "Roma", "Viterbo"], nel
+anelli = [Path(np.array(a)) for a in d["regione"]]
+def nel_lazio(la, lo):
+    return any(a.contains_point((lo, la)) for a in anelli)
+for nome, la, lo in pc.PAESI + [pc.STAZIONE]:
+    assert nel_lazio(la, lo), nome + " dovrebbe stare dentro il Lazio"
+for nome, la, lo in (("Siena", 43.32, 11.33), ("L'Aquila", 42.35, 13.40), ("Caserta", 41.07, 14.33), ("Terni", 42.56, 12.64)):
+    assert not nel_lazio(la, lo), nome + " dovrebbe stare fuori dal Lazio"
+# il disegno deve usare le linee: confine spesso, province sottili
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots()
+pc.disegna_confini(ax)
+spessori = sorted({round(l.get_linewidth(), 1) for l in ax.lines})
+assert spessori == [0.7, 1.0, 2.6], spessori
+print("confini ok:", len(d["regione"]), "anelli del Lazio,", len(d["province"]), "province, linee", spessori)
+EOF
+
 passo "file met_em fatti come quelli di metgrid 4.7 (livelli letti dalla dimensione e dall'attributo)"
 python3 - "$T" <<'EOF'
 import subprocess, sys

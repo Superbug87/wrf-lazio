@@ -609,8 +609,42 @@ def livelli(campo, n=9, span_min=0.0, massimo=None):
     return lv
 
 
+_CONFINI = None
+FILE_CONFINI = Path(__file__).resolve().parent / "dati" / "confini_lazio.json"
+
+
+def carica_confini():
+    """(anelli del Lazio, anelli delle province del Lazio, anelli delle altre province) come array (n, 2) lon/lat.
+    Il file lo fa wrf/prepara_confini.py dai confini ISTAT; se manca le mappe escono senza confini."""
+    global _CONFINI
+    if _CONFINI is None:
+        try:
+            d = json.loads(FILE_CONFINI.read_text(encoding="utf-8"))
+            reg = [np.array(a) for a in d["regione"]]
+            nel = [np.array(a) for p in d["province"] if p["regione"] == "Lazio" for a in p["anelli"]]
+            fuori = [np.array(a) for p in d["province"] if p["regione"] != "Lazio" for a in p["anelli"]]
+            _CONFINI = (reg, nel, fuori)
+        except (OSError, ValueError, KeyError) as e:
+            print(f"Confini non disponibili ({FILE_CONFINI.name}: {e}): mappe senza confini", file=sys.stderr)
+            _CONFINI = ([], [], [])
+    return _CONFINI
+
+
+def disegna_confini(ax, scala=1.0):
+    """Confine del Lazio (linea spessa), confini delle sue province (più sottile) e delle province vicine (sottile e grigia).
+    `scala` assottiglia le linee nei riquadri piccoli."""
+    reg, nel, fuori = carica_confini()
+    for a in fuori:
+        ax.plot(a[:, 0], a[:, 1], color=SEC, lw=0.7 * scala, alpha=0.75, zorder=3, solid_joinstyle="round")
+    for a in nel:
+        ax.plot(a[:, 0], a[:, 1], color=INK, lw=1.0 * scala, alpha=0.85, zorder=3.5, solid_joinstyle="round")
+    for a in reg:
+        ax.plot(a[:, 0], a[:, 1], color=INK, lw=2.6 * scala, zorder=4, solid_joinstyle="round", solid_capstyle="round")
+
+
 def decora(ax, z_f, lat_f, lon_f):
     halo = [pe.withStroke(linewidth=3, foreground=SFONDO)]
+    disegna_confini(ax)
     ax.contour(lon_f, lat_f, z_f, levels=LIVELLI_QUOTA, colors=TENUE,
                linewidths=0.6, alpha=0.8, zorder=2)
     for _, la, lo, rla, rlo in LAGHI:
@@ -722,7 +756,8 @@ def disegna_mappe(c, z_f, lat_f, lon_f, k, tempi, titolo_banner, modello_txt, ou
         ("2/2", ["pioggia", "umid", "cape"], "lazio_2_pioggia_umidita_cape.png"),
     ]
     def testo_note(sigla):
-        note = ["Linee grigie: quota ogni 500 m. Laghi e posizioni delle città sono schematici.", modello_txt,
+        note = ["Linee scure: confine del Lazio (spessa) e confini provinciali (sottili); linee grigie chiare: quota ogni 500 m. "
+                "Laghi e posizioni delle città sono schematici. Confini: ISTAT, elaborati da Openpolis (CC BY 4.0).", modello_txt,
                 "Non sostituisce le previsioni ufficiali."]
         if sigla == "2/2":
             note.insert(1, "CAPE alto = ambiente favorevole ai temporali, non una certezza.")

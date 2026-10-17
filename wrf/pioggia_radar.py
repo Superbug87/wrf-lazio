@@ -204,6 +204,7 @@ def disegna_griglia(percorso, titolo, sotto, banner, riquadri, colonne, testo, z
         for sp_ in ax.spines.values():
             sp_.set_color(pc.LINEA)
         riempi(ax, q["campo"])
+        pc.disegna_confini(ax, scala=0.55)
         ax.contour(lon_f, lat_f, z_f, levels=pc.LIVELLI_QUOTA, colors=pc.TENUE, linewidths=0.4,
                    alpha=0.8, zorder=2)
         ax.plot(pc.STAZIONE[2], pc.STAZIONE[1], "*", ms=8, color=pc.INK, mec=pc.SFONDO, mew=0.6, zorder=8)
