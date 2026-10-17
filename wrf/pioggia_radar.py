@@ -50,7 +50,7 @@ warnings.filterwarnings("ignore", message="All-NaN")
 
 ORE_STORIA = 6               # ore passate da verificare
 MEZZO = 250                  # il ritaglio del radar e' un quadrato di 500 km di lato: la pioggia che arriva in 3 ore da lontano ci sta
-N_GRIGLIA = 81               # punti per lato della griglia delle mappe (passo ~3,2 km: come i 3 km di WRF)
+N_GRIGLIA = 129              # punti per lato della griglia delle mappe (passo ~2 km: come i 2 km di WRF)
 SOGLIE_FSS = (0.5, 2.0)      # mm in un'ora
 LATO_FSS_KM = 10
 ORE_AVANTI = 3
@@ -121,8 +121,8 @@ def fss(prev, oss, soglia, n):
 
 
 def griglia_radar(campo, orig, LAT, LON):
-    """Il radar (pixel da 1 km) sulla griglia delle mappe (3 km): media sui pixel attorno a ogni punto, come fa WRF
-    con una cella da 3 km, invece di prendere il valore di un solo pixel."""
+    """Il radar (pixel da 1 km) sulla griglia delle mappe (2 km): media sui pixel attorno a ogni punto, come fa WRF
+    con una cella da 2 km, invece di prendere il valore di un solo pixel."""
     n = max(1, int(round(PASSO_GRIGLIA_KM)))
     if n > 1:
         ok = np.isfinite(campo)
@@ -408,7 +408,7 @@ def main():
 
     pil = a.pilota.upper()
     ciclo_txt = f"{pil} {a.ciclo[:8]} {a.ciclo[8:]}Z" if a.ciclo else pil
-    banner = f"WRF 3 km ({ciclo_txt}) + Radar-DPC"
+    banner = f"WRF 2 km ({ciclo_txt}) + Radar-DPC"
     ora_radar_loc = locale(da_ms(istanti[-1]))
 
     ris = verifica(frames, istanti, orig, wrf, LAT, LON, passo_km)

@@ -1,10 +1,11 @@
 # WRF sul Lazio
 
 Previsione a 48 ore con **WRF** (modello fisico vero) su tre domini annidati centrati sul Lazio
-(41,82 N, 12,72 E): **27 km → 9 km → 3 km**. Il dominio a 3 km (306 km di lato) copre tutta la regione. Parte dai dati aperti di **ECMWF**
+(41,82 N, 12,72 E): **18 km → 6 km → 2 km**. Il dominio a 2 km (300 km di lato) copre tutta la regione. Parte dai dati aperti di **ECMWF**
 (IFS 0,25°; GFS è l'alternativa) e gira ogni giorno sui server gratuiti di GitHub. Alla fine disegna le mappe
-(temperatura a 2 m e 850 hPa, vento medio, raffiche, pioggia 1/3/6 h, pressione, umidità, CAPE),
-una ogni 6 ore, più una immagine per ogni ora e variabile, e le pubblica nel ramo `risultati`.
+(30 tipi: temperatura a 2 m, 925 e 850 hPa, zero termico, umidità, vento medio, raffiche, pioggia 1/3/6/12/24 h,
+neve 6/24 h, pressione, nuvolosità totale/bassa/media/alta, CAPE (parcella più instabile e strato mescolato), CIN, shear 0-1/0-3/0-6 km,
+elicità 0-1/0-3 km, rischio fulmini, rischio supercelle, rischio tornado), una ogni 6 ore, più una immagine per ogni ora e variabile, e le pubblica nel ramo `risultati`.
 
 Nasce dal progetto gemello **wrf-castelli** (stessa catena, tre domini a 9 → 3 → 1 km sui Castelli Romani): qui cambiano la
 geometria dei domini, il passo di calcolo, le stazioni, il mare, le mappe e il radar; compilazione, scarico dei dati, ungrib,
@@ -26,19 +27,20 @@ metgrid, real, segmenti e pubblicazione sono gli stessi. Questo repository è **
 ## Che cosa cambia rispetto ai Castelli Romani
 | | Castelli Romani | Lazio |
 |---|---|---|
-| domini | 9 → 3 → 1 km (450, 162, 60 km di lato) | 27 → 9 → 3 km (1296, 540, 306 km di lato) |
-| passo di calcolo | 45 s (nidi: 15 s e 5 s) | 144 s (nidi: 48 s e 16 s) |
-| convezione | esplicita da 3 km in giù | Kain-Fritsch a 27 e 9 km, esplicita a 3 km |
-| mappe | 40 x 40 km, passo ~1 km | 256 x 256 km (40,67-42,97 N, 11,18-14,26 E), passo ~3 km |
-| stazioni nel nudging | fino a 40 / 30 / 20 | **tutte** quelle trovate nell'area del dominio a 3 km (in una prova ne ha trovate circa 2100; quante restano dopo i controlli lo dice il log), nessun tetto |
+| domini | 9 → 3 → 1 km (450, 162, 60 km di lato) | 18 → 6 → 2 km (936, 432, 300 km di lato) |
+| passo di calcolo | 45 s (nidi: 15 s e 5 s) | 90 s (nidi: 30 s e 10 s) |
+| convezione | esplicita da 3 km in giù | Kain-Fritsch a 18 e 6 km, esplicita a 2 km |
+| mappe | 40 x 40 km, passo ~1 km | 256 x 256 km (40,67-42,97 N, 11,18-14,26 E), passo ~2 km |
+| stazioni nel nudging | fino a 40 / 30 / 20 | **tutte** quelle trovate nell'area del dominio a 2 km (in una prova ne ha trovate circa 2100; quante restano dopo i controlli lo dice il log), nessun tetto |
 | raggio del nudging | 100 / 50 / 25 km | 200 / 100 / 50 km |
 | temperatura del mare (MUR) | 1 km, 39-44,5 N 9-16,5 E | un punto ogni 2 km, 35,5-48 N 4-21,5 E |
-| radar | un pixel ogni punto della mappa | media dei pixel da 1 km attorno a ogni punto da 3 km |
+| radar | un pixel ogni punto della mappa | media dei pixel da 1 km attorno a ogni punto da 2 km |
 
-**Perché 3 km e non 1 km su tutta la regione.** Il Lazio è circa 230 x 210 km: un dominio a 1 km che lo coprisse con i margini (circa 300 x 300 km)
-avrebbe circa 90 000 colonne, 25 volte quelle del dominio a 1 km dei Castelli, e il calcolo non starebbe nei tempi gratuiti di GitHub. A 3 km il costo (celle x passi) è
-circa tre quarti di quello dei Castelli. Contro: il rilievo è levigato (l'Appennino a 3 km perde le valli strette) e i
-temporali sono meno nitidi. Per il dettaglio sui Castelli resta il progetto gemello.
+**Perché 2 km e non 1 km su tutta la regione.** Il Lazio è circa 230 x 210 km: un dominio a 1 km che lo coprisse con i margini (circa 300 x 300 km)
+avrebbe circa 90 000 colonne e il calcolo non starebbe nei tempi gratuiti di GitHub. A 2 km (151 x 151 colonne, passo di 10 s) il costo
+(celle x passi) è circa 3 volte quello del vecchio assetto a 27/9/3 km: stima 1,5-2 ore per segmento di 16 ore, da confermare con il
+primo run. Le celle a 2 km risolvono i temporali in modo esplicito (senza parametrizzazione), ma non le valli strette dell'Appennino. Per il dettaglio
+sui Castelli resta il progetto gemello.
 
 ## Prima di cominciare
 - Il repository deve essere **pubblico**: i server sono da 4 processori e i minuti sono illimitati.
@@ -66,12 +68,12 @@ Tempi **stimati** (non ancora misurati qui; la compilazione e i dati statici son
 | dati statici (terreno, uso del suolo) | solo la prima volta | 30-60 min (il dominio esterno è 8 volte più esteso: forse di più) |
 | scarico ECMWF, ungrib, metgrid, real | ogni giorno | 10-20 min |
 | stazioni Wunderground (ricerca e lettura, in parallelo) | ogni giorno | circa 3 min (misurato: 30 s di ricerca e 100 s di lettura per ~2100 stazioni) |
-| WRF, 3 segmenti da 16 h in fila | ogni giorno | 1-2 h ciascuno |
+| WRF, 3 segmenti da 16 h in fila | ogni giorno | stima 1,5-2 h ciascuno (da misurare con i 2 km) |
 | mappe e pubblicazione | ogni giorno | 5-10 min |
 
 GitHub ferma ogni job dopo 6 ore, per questo la previsione è divisa in segmenti che ripartono dal *restart*
 del precedente. Se i segmenti vanno stretti, abbassa `ore_segmento` (massimo 4 segmenti) o `ore`.
-Le uscite del dominio a 3 km pesano circa tre volte quelle dei Castelli (stima: circa 1,5 GB per segmento prima della compressione).
+Le uscite del dominio a 2 km (151 x 151 colonne) pesano circa il doppio di quelle del vecchio assetto a 3 km.
 
 **La compilazione è a tappe** (`wrf/costruisci.sh prepara|wrf|wps|installa`, quattro passi del job `costruzione`):
 - mentre WRF compila, il log scrive ogni 5 minuti a che punto è (oggetti compilati, ultimo file, carico, memoria);
@@ -87,7 +89,7 @@ Le uscite del dominio a 3 km pesano circa tre volte quelle dei Castelli (stima: 
 - Ramo **`risultati`** del repository: la cartella `ultimo/` e il suo `README.md` con tutte le immagini
   (si legge bene dall'app GitHub). In `archivio/` ci sono gli ultimi 28 cicli (14 giorni).
 - Stesso ramo, cartella **`orarie/`**: una immagine per ogni ora e per ogni tipo di mappa (solo tipo, ora del run e ora
-  della mappa, senza descrizioni), degli ultimi 14 cicli (una settimana, circa 14 MB a ciclo: immagini a 128 colori);
+  della mappa, senza descrizioni), degli ultimi 14 cicli (una settimana: 30 variabili x 49 ore a 64 colori, circa 60-100 KB l'una, 60-80 MB a ciclo e circa 1 GB per i 14 cicli);
   `orarie/cicli.json` elenca i cicli presenti, `orarie/<ciclo>/indice.json` variabili e ore di ciascuno. Il ramo viene
   riscritto con un solo commit a ogni pubblicazione, così la storia non cresce.
 - **Sul sito**: la pagina `sito/previsioni-wrf-lazio.html` (un solo file, senza dipendenze) sfoglia le immagini
@@ -103,7 +105,7 @@ Le uscite del dominio a 3 km pesano circa tre volte quelle dei Castelli (stima: 
 ## Cosa fa e cosa non fa
 - WRF è alimentato da un solo modello globale per volta (ECMWF o GFS).
 - **Stazioni Wunderground dentro WRF (nudging).** Con la chiave `WU_API_KEY`, prima del calcolo si cercano **tutte** le
-  stazioni nell'area del dominio a 3 km (il Lazio più un margine attorno). Ogni ricerca ne dà al massimo 10, quindi l'area si
+  stazioni nell'area del dominio a 2 km (il Lazio più un margine attorno). Ogni ricerca ne dà al massimo 10, quindi l'area si
   divide in riquadri e ogni riquadro in cui le 10 stazioni più vicine non bastano a coprirlo si divide ancora, fino a riquadri
   di mezzo km nei centri abitati; le ricerche e le letture girano in parallelo (24 alla volta, al massimo 40 chiamate al
   secondo). Di ogni stazione si legge la posizione/quota attuale e lo storico delle ultime 24 ore. Poi si **scartano quelle
@@ -131,11 +133,11 @@ Le uscite del dominio a 3 km pesano circa tre volte quelle dei Castelli (stima: 
   Si regola con `WU_CHIAMATE_AL_SECONDO` (default 40) e `WU_THREAD` (default 24).
 - **Temperatura del mare.** ECMWF dà la temperatura del mare a 25 km. Per il mare si scarica l'analisi MUR SST di NASA JPL
   (0,01°, circa 1 km, qui diradata a un punto ogni 0,02°, con 1-2 giorni di ritardo, tenuta costante per le 48 ore) e WRF la usa sui punti d'acqua
-  al posto di quella del modello globale. Il riquadro scaricato copre tutto il dominio a 27 km.
+  al posto di quella del modello globale. Il riquadro scaricato copre tutto il dominio a 18 km.
   Se il servizio non risponde, WRF gira lo stesso con la temperatura del mare del modello globale.
 - **Radar (Protezione Civile).** Due immagini in più, `radar_1_verifica` e `radar_2_prossime_3_ore`, e un CSV nell'archivio.
   *Verifica*: per le ultime ore (fino a 6) la pioggia oraria misurata dal radar nazionale (prodotto SRI, mosaico a 1 km
-  ogni 5 minuti, mediata sui 3 km di WRF) accanto a quella di WRF, con la media sull'area delle mappe (256 x 256 km), la quota di area bagnata
+  ogni 5 minuti, mediata sui 2 km di WRF) accanto a quella di WRF, con la media sull'area delle mappe (256 x 256 km), la quota di area bagnata
   e un indice di accordo di posizione (FSS, soglia 0,5 mm in un'ora, controllato su circa 10 km). *Prossime 3 ore*: il radar spostato lungo il movimento che
   ha adesso, WRF per le stesse ore, e un mix dei due in cui il peso del radar scende da 83% (prima ora) a 17% (terza).
   I pesi sono una scelta di buon senso, **non tarati**. Se il radar non risponde lo script esce e le mappe di WRF non cambiano.
@@ -148,12 +150,22 @@ Le uscite del dominio a 3 km pesano circa tre volte quelle dei Castelli (stima: 
   temporali: dopo 1-2 ore conta soprattutto WRF. Il radar stesso può sbagliare (echi dei monti, schermature, calibrazione).
   Il confronto con WRF vero non è stato ancora visto. Il CSV (`archivio/<ciclo>/radar_verifica.csv`) serve a vedere nel tempo
   se WRF migliora e a tarare i pesi.
-- **Raffiche = stima**: massimo orario del vento a 10 m (diagnostica di WRF) × 1,4.
-- **CAPE = stima** da parcella di superficie. Controllata contro MetPy su 5 profili: scarti sotto l'1%.
-- ECMWF (come GFS) ha punti ogni 25 km: i 3 km vengono da WRF e dall'orografia, non dal dato di partenza.
+- **Raffiche = stima**: massimo orario del vento a 10 m di WRF (`nwp_diagnostics`) e raffica «turbolenta» (vento medio + 7,71 u\* f,
+  con f che cresce con l'instabilità, metodo del modello ECMWF, Bechtold e Bidlot 2009); la mappa mostra il più alto dei due.
+  Non ancora tarata sulle raffiche misurate dalle stazioni: si regola con la variabile d'ambiente `WRF_FATTORE_TURBOLENZA` (1 = metodo originale).
+- **CAPE e CIN = stima** calcolate colonna per colonna su tutti i livelli di WRF: parcella più instabile (MU, nei primi 300 hPa) e strato mescolato
+  (ML, 100 hPa), con temperatura virtuale e livello di libera convezione. Controllate contro MetPy su profili simili a quelli di WRF
+  (scarti attorno al 10% per ML, molto meno per MU): è un controllo del calcolo, non della previsione.
+- **Zero termico, T a 925 e 850 hPa**: interpolati in ln p; sotto il suolo si estrapola con 6,5 K/km. **Nuvolosità**: da CLDFRA con
+  sovrapposizione massima-casuale (bassa sigma > 0,8, media 0,45-0,8, alta < 0,45). **Neve fresca**: precipitazione solida di WRF con densità di
+  Hedstrom e Pomeroy (1998), non accumulata sul suolo. **Shear e SRH**: vento a quote fisse sopra il suolo, moto della tempesta di Bunkers.
+- **Rischio fulmini, supercelle e tornado sono INDICI, non probabilità.** Fulmini: LPI di WRF (`lightning_option = 3`) e corrente ascendente × graupel;
+  supercelle: tipo SCP (CAPE, CIN, SRH 0-3 km, shear 0-6 km); tornado: tipo STP (CAPE e CIN del livello mescolato, base delle nubi, SRH 0-1 km, shear 0-6 km).
+  Nascono su dati degli Stati Uniti e **non sono tarati sull'Italia**: dicono dove le condizioni sono favorevoli, non quanto è probabile l'evento.
+  I tornado sono eventi di scala molto più piccola dei 2 km: l'indice segnala un ambiente, non prevede un tornado. Ogni mappa lo dichiara in basso.
+- ECMWF (come GFS) ha punti ogni 25 km: i 2 km vengono da WRF e dall'orografia, non dal dato di partenza.
 - I dati ECMWF sono quelli *open data* (licenza CC-BY 4.0): per ogni ora si scaricano solo i campi che servono
-  (circa 40 MB invece di 140), si ritagliano su Mediterraneo e Europa (30-54 N, 0-32 E, più del dominio a 27 km, che va da 35,7 a 47,7 N
-  e da 4,1 a 21,3 E) e si riscrivono con compressione semplice perché
+  (circa 40 MB invece di 140), si ritagliano su Mediterraneo e Europa (30-54 N, 0-32 E, più del dominio a 18 km) e si riscrivono con compressione semplice perché
   `ungrib` non legge la compressione CCSDS di ECMWF. Gli strati di suolo, numerati da 1 a 4, diventano
   profondità in cm (0-7, 7-28, 28-100, 100-289) e l'orografia dell'ora 0 è copiata in tutte le ore.
 - Le mappe mostrano una stella per Velletri (il valore scritto in basso a destra di ogni riquadro) e le città principali.
@@ -161,8 +173,8 @@ Le uscite del dominio a 3 km pesano circa tre volte quelle dei Castelli (stima: 
   piene lungo la linea (una ogni ~18 km) che danno il verso, oltre 100 linee e più di 600 freccette nelle immagini orarie (prima
   erano 100 frecce corte). Le tessere da 6 ore sono meno fitte. Il colore sotto resta la velocità del vento. Si regola con
   `densita` in `disegna_flusso()` (`previsioni_lazio.py`).
-- Il bordo del dominio a 3 km è a 25 km o più dalle mappe, ma le celle vicino al bordo del nido sono comunque influenzate
-  dal dominio a 9 km: non fidarsi troppo dei dettagli ai margini della mappa.
+- Il bordo del dominio a 2 km è a 25 km o più dalle mappe, ma le celle vicino al bordo del nido sono comunque influenzate
+  dal dominio a 6 km: non fidarsi troppo dei dettagli ai margini della mappa.
 - Non sostituisce le previsioni ufficiali.
 
 ## Fonti dei dati e licenze
@@ -187,22 +199,22 @@ Le condizioni dei fornitori possono cambiare: prima di usare il progetto in modo
 ## Stato del collaudo
 **Nessuna esecuzione di WRF su GitHub è ancora stata fatta in questo repository.** Il codice è quello del progetto dei Castelli Romani
 (dove compilazione, geogrid, segmenti e pubblicazione sono stati provati il 16 ottobre 2026, con le correzioni già incluse qui)
-adattato al Lazio.
+adattato al Lazio. Un primo run a 27/9/3 km è finito il 17 ottobre 2026; l'assetto a 18/6/2 km con le 30 mappe non è ancora stato eseguito.
 
 Provato qui (in un ambiente senza compilatore Fortran): geometria dei tre domini (annidamento centrato, margini, mappe e
-tutta la regione dentro il dominio a 3 km), namelist (letti da f90nml: passo di 144 s che divide segmenti, bordi e uscite
-orarie), file delle stazioni (inventate) riletti con le istruzioni di lettura di WRF, file `SST` riletto con `rd_intermediate` di WPS,
-mappe e immagini orarie a partire da file `wrfout` inventati con la struttura di WRF (griglia 103 x 103 a 3 km),
-mappe con dati inventati di `previsioni_lazio.py`, radar vero (scarico, media sui 3 km e le due immagini; il confronto con una pioggia vera
+tutta la regione dentro il dominio a 2 km), namelist (letti da f90nml: passo di 90 s che divide segmenti, bordi e uscite
+orarie), grandezze derivate (`wrf/diagnostiche.py`) su casi con risposta nota (atmosfera standard, vento che gira con la quota, neve, raffica), file delle stazioni (inventate) riletti con le istruzioni di lettura di WRF, file `SST` riletto con `rd_intermediate` di WPS,
+mappe e immagini orarie a partire da file `wrfout` inventati con la struttura di WRF (griglia 151 x 151 a 2 km, 30 variabili),
+mappe con dati inventati di `previsioni_lazio.py`, radar vero (scarico, media sui 2 km e le due immagini; il confronto con una pioggia vera
 non è stato visto), pubblicazione nel ramo `risultati` su un repository finto, sintassi del flusso (actionlint in CI), degli script (shellcheck) e della pagina del sito.
 Queste prove girano da sole a ogni modifica del codice: `wrf/prove.sh`, lanciato dal flusso **Prova automatica**
 (`.github/workflows/prova.yml`, pochi minuti, non tocca le cache di WRF). Si può lanciare anche a mano: `bash wrf/prove.sh`
 (con `PROVA_RADAR=1` prova anche il radar vero).
 
 **Non provato in questo repository:** compilazione di WRF e WPS, download dei dati geografici NCAR, geogrid sul nuovo dominio
-(1296 km a 27 km: più grande di quello dei Castelli), metgrid con il riquadro MUR esteso, real.exe e wrf.exe a 144 s
-(stabilità numerica e tempi di calcolo da misurare), nudging con oltre 1600 stazioni e raggi 200/100/50 km (file delle osservazioni grandi), uscite da circa 1,5 GB
-per segmento, pagina del sito con dati veri. Le scelte fisiche (Kain-Fritsch a 9 km, radiazione ogni 30/10/5 minuti, nessun
+(936 km a 18 km), metgrid con il riquadro MUR esteso, real.exe e wrf.exe a 90 s
+(stabilità numerica e tempi di calcolo da misurare), accettazione da parte di WRF di `nwp_diagnostics` e `lightning_option = 3`, nudging con oltre 1600 stazioni e raggi 200/100/50 km (file delle osservazioni grandi), uscite grandi
+per segmento, pagina del sito con dati veri. Le scelte fisiche (Kain-Fritsch a 6 km, radiazione ogni 18/6/3 minuti, nessun
 `slope_rad`) sono ragionevoli ma non tarate. Il primo avvio potrebbe richiedere qualche correzione: i log escono come artifact.
 
 ## File
@@ -210,7 +222,7 @@ per segmento, pagina del sito con dati veri. Le scelte fisiche (Kain-Fritsch a 9
 - `wrf/dominio.py` — geometria dei tre domini · `wrf/config.py` — namelist di WPS e WRF
 - `wrf/dipendenze.sh`, `costruisci.sh` (a tappe, con avanzamento e guardiano), `statico.sh`, `esegui.sh`, `pubblica.sh`
 - `wrf/scarica_ecmwf.py` + `wrf/Vtable.ECMWF_OD` — dati ECMWF · `wrf/scarica_gfs.py` — alternativa GFS
-- `wrf/postprocess.py` — da `wrfout` alle mappe · `wrf/orarie.py` — una immagine per ora e variabile + `indice.json`
+- `wrf/diagnostiche.py` — CAPE/CIN, shear, SRH, nuvole, zero termico, indici di rischio, raffica e neve, colonna per colonna · `wrf/postprocess.py` — da `wrfout` alle mappe · `wrf/orarie.py` — una immagine per ora e variabile + `indice.json`
 - `sito/previsioni-wrf-lazio.html` — pagina per sfogliare le immagini orarie (da caricare sul sito)
 - `wrf/stazioni_wrf.py` — stazioni Wunderground nel formato di WRF per il nudging
 - `wrf/scarica_sst.py` — temperatura del mare MUR nel formato intermedio di WPS (campo `SST`)

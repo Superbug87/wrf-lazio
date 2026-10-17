@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Genera i namelist di WPS e WRF per i tre domini annidati sul Lazio (27, 9 e 3 km: vedi dominio.py).
+"""Genera i namelist di WPS e WRF per i tre domini annidati sul Lazio (18, 6 e 2 km: vedi dominio.py).
 
   config.py wps   --ciclo 2026101600 --ore 48 [--pilota ecmwf|gfs] [--geog PERCORSO]   > namelist.wps
   config.py input --ciclo 2026101600 --da 0 --a 16 [--nlev 34 --nsoil 4] > namelist.input
@@ -15,12 +15,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import dominio as D  # noqa: E402
 
-# s sul dominio 1 (27 km); 48 s e 16 s nei nidi (parent_time_step_ratio 1:3:3), circa 5 s per km di passo griglia.
+# s sul dominio 1 (18 km); 30 s e 10 s nei nidi (parent_time_step_ratio 1:3:3), circa 5 s per km di passo griglia.
 # Deve dividere esattamente la durata di un segmento (16 h = 57600 s), l'intervallo dei bordi (3 h) e le uscite
 # orarie: con 54 s (nei Castelli, a 9 km) l'ultimo passo di d01 sforava le 16:00 e WRF non scriveva i restart di
-# d01 e d02. 144 s divide 57600 (400 passi), 10800 (75) e 3600 (25); e 144 / 9 = 16 s è intero.
-TIME_STEP = 144
-# le osservazioni delle stazioni si rileggono ogni 4 passi del dominio 1 (576 s, circa 10 minuti di simulazione)
+# d01 e d02. 90 s divide 57600 (640 passi), 10800 (120) e 3600 (40); e 90 / 9 = 10 s è intero.
+TIME_STEP = 90
+# le osservazioni delle stazioni si rileggono ogni 4 passi del dominio 1 (360 s, 6 minuti di simulazione)
 OBS_INTERVALLO_S = 4 * TIME_STEP
 
 
@@ -103,6 +103,7 @@ def namelist_input(inizio, fine, riprendi, nlev, nsoil, obs_minuti=None, obs_ven
     t += " io_form_history = 2,\n io_form_restart = 2,\n io_form_input = 2,\n io_form_boundary = 2,\n"
     t += " history_outname = 'wrfout_d<domain>_<date>',\n"
     # massimi orari (tra cui il vento a 10 m) per stimare le raffiche
+    t += " nwp_diagnostics = 1,\n"       # massimi orari: vento a 10 m, corrente ascendente, graupel, elicità
     t += " output_diagnostics = 1,\n auxhist3_outname = 'wrfxtrm_d<domain>_<date>',\n"
     t += riga("auxhist3_interval", [60] * 3)
     t += riga("frames_per_auxhist3", [1000] * 3)
@@ -129,11 +130,12 @@ def namelist_input(inizio, fine, riprendi, nlev, nsoil, obs_minuti=None, obs_ven
     t += "&physics\n"
     t += riga("mp_physics", [8] * 3)                       # Thompson
     t += riga("ra_lw_physics", [4] * 3) + riga("ra_sw_physics", [4] * 3)   # RRTMG
-    t += riga("radt", [30, 10, 5])                          # minuti: circa 1 per km di passo griglia
+    t += riga("radt", [18, 6, 3])                           # minuti: 12, 12 e 18 passi; l'ultimo costa (RRTMG sulle celle a 2 km)
     t += riga("sf_sfclay_physics", [1] * 3) + riga("sf_surface_physics", [2] * 3)  # Noah
     t += riga("bl_pbl_physics", [1] * 3) + riga("bldt", [0] * 3)           # YSU
-    t += riga("cu_physics", [1, 1, 0]) + riga("cudt", [0] * 3)             # Kain-Fritsch a 27 e 9 km, convezione esplicita a 3 km
+    t += riga("cu_physics", [1, 1, 0]) + riga("cudt", [0] * 3)             # Kain-Fritsch a 18 e 6 km, convezione esplicita a 2 km
     t += riga("topo_wind", [1] * 3)
+    t += riga("lightning_option", [0, 0, 3])                # indice di potenziale di fulmini (LPI) solo nel dominio fine
     t += riga("slope_rad", [0] * 3) + riga("topo_shading", [0] * 3)        # servono sotto circa 1-2 km di passo
     t += " isfflx = 1,\n ifsnow = 1,\n icloud = 1,\n surface_input_source = 1,\n"
     t += " num_soil_layers = 4,\n num_land_cat = 21,\n sst_update = 0,\n"
@@ -153,7 +155,7 @@ def namelist_input(inizio, fine, riprendi, nlev, nsoil, obs_minuti=None, obs_ven
     if obs_minuti is not None:
         # Nudging verso le stazioni fino all'ultima osservazione (fdda_end, minuti dall'inizio del ciclo);
         # dopo il modello prosegue libero. Raggi di influenza (km) piccoli nei domini fini: la quota conta.
-        # Il Lazio è montuoso (Appennino fino a 2200 m) e il terreno a 3 km è levigato: raggio di 50 km nel nido fine.
+        # Il Lazio è montuoso (Appennino fino a 2200 m): raggio di 50 km nel nido fine.
         t += "&fdda\n"
         t += riga("obs_nudge_opt", [1] * 3) + " max_obs = 150000,\n"
         t += riga("fdda_start", ["0."] * 3) + riga("fdda_end", [f"{float(obs_minuti):.1f}"] * 3)

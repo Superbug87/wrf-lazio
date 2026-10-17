@@ -254,7 +254,7 @@ jobs:
           name: stato-${{ matrix.seg }}
           path: /home/runner/lavoro/stato.tgz
           retention-days: 2
-      - name: Salvo le uscite del dominio a 3 km
+      - name: Salvo le uscite del dominio a 2 km
         if: steps.s.outputs.attivo == 'true'
         uses: actions/upload-artifact@v6
         with:

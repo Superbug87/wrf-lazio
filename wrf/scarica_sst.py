@@ -23,10 +23,10 @@ import numpy as np
 import requests
 
 URL = "https://coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.nc"
-# un po' piu' del dominio a 27 km (1296 km attorno a 41,82 N 12,72 E: 35,75-47,64 N, 4,14-21,30 E)
+# piu' del dominio a 18 km (936 km attorno a 41,82 N 12,72 E: 37,6-46,0 N, 7,0-18,4 E): il riquadro e' rimasto largo
 LAT_MIN, LAT_MAX = 35.5, 48.0
 LON_MIN, LON_MAX = 4.0, 21.5
-PASSO = 2             # si tiene un punto ogni 2 (0,02 gradi, circa 2 km): basta per i 3 km del dominio fine e la richiesta resta leggera
+PASSO = 2             # si tiene un punto ogni 2 (0,02 gradi, circa 2 km): basta per i 2 km del dominio fine e la richiesta resta leggera
 DILATA = 6            # celle di terra riempite col mare piu' vicino, per non lasciare buchi lungo la costa
 
 

@@ -1,17 +1,17 @@
-"""Geometria dei tre domini annidati (27 -> 9 -> 3 km) centrati sul Lazio.
+"""Geometria dei tre domini annidati (18 -> 6 -> 2 km) centrati sul Lazio.
 
-Il dominio a 3 km (306 km di lato) copre tutta la regione con un margine di 25 km o più da ogni lato;
-quello a 9 km e quello a 27 km portano le condizioni di ECMWF/GFS (25 km) fino al dominio fine.
-Le mappe (previsioni_lazio.py: LAT0, LON0, MEZZO_LAT, MEZZO_LON) stanno dentro il dominio a 3 km.
+Il dominio a 2 km (300 km di lato) copre tutta la regione con un margine di 20 km o più da ogni lato;
+quello a 6 km e quello a 18 km portano le condizioni di ECMWF/GFS (25 km) fino al dominio fine.
+Le mappe (previsioni_lazio.py: LAT0, LON0, MEZZO_LAT, MEZZO_LON) stanno dentro il dominio a 2 km.
 
 Se cambi qualcosa qui, la cache dei dati statici (geogrid) viene rifatta da zero.
 """
 
 LAT0, LON0 = 41.82, 12.72          # centro comune dei tre domini (Lazio: 40,8-42,85 N, 11,45-14,0 E)
 TRUELAT1, TRUELAT2 = 39.5, 44.0    # proiezione conforme di Lambert
-DX = [27000, 9000, 3000]           # metri
+DX = [18000, 6000, 2000]           # metri
 RATIO = [1, 3, 3]                  # rapporto con il dominio padre
-E = [49, 61, 103]                  # punti per lato (e_we = e_sn): 1296 km, 540 km, 306 km
+E = [53, 73, 151]                  # punti per lato (e_we = e_sn): 936 km, 432 km, 300 km
 E_VERT = 40                        # livelli verticali (39 di massa)
 
 
@@ -43,7 +43,7 @@ def verifica():
             raise ValueError(f"dominio {d + 1}: meno di 5 celle di margine nel padre")
     lato_km = [celle(d) * DX[d] / 1000 for d in range(3)]
     if lato_km[2] < 280:
-        raise ValueError("il dominio a 3 km deve coprire tutto il Lazio (circa 230 km) più un margine per i bordi del nido")
+        raise ValueError("il dominio a 2 km deve coprire tutto il Lazio (circa 230 km) più un margine per i bordi del nido")
     return starts, lato_km
 
 

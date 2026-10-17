@@ -5,7 +5,7 @@ Stazioni Weather Underground -> file delle osservazioni per il nudging di WRF (O
   WU_API_KEY=... stazioni_wrf.py --ciclo 2026101600 --geo ~/wrf-geo --out run
 
 Cosa fa:
-  1. trova TUTTE le stazioni di Wunderground nell'area del dominio a 3 km (il Lazio e un margine attorno): la ricerca
+  1. trova TUTTE le stazioni di Wunderground nell'area del dominio a 2 km (il Lazio e un margine attorno): la ricerca
      dà al massimo 10 stazioni per volta, quindi si divide l'area in riquadri e si suddivide ogni riquadro in cui le
      10 stazioni più vicine non bastano a coprirlo tutto (nei centri abitati si scende fino a riquadri di mezzo km);
   2. di ognuna legge la posizione/quota attuale e lo storico delle ultime 24 ore (dati ogni 5 minuti), con molte
@@ -239,7 +239,7 @@ def vicine_a(chiave, la, lo):
 
 def cerca(chiave, domini, adesso):
     """
-    Tutte le stazioni nell'area del dominio a 3 km. Ogni ricerca dà le 10 stazioni più vicine al punto: si sa quindi che
+    Tutte le stazioni nell'area del dominio a 2 km. Ogni ricerca dà le 10 stazioni più vicine al punto: si sa quindi che
     dentro il cerchio che arriva alla decima non ne manca nessuna. Si parte da riquadri grandi, si interroga il centro e,
     se il cerchio non copre tutto il riquadro, lo si divide in 4 e si ripete (a ondate, in parallelo), saltando i riquadri
     già coperti da cerchi di altre ricerche. Ritorna {id: (lat, lon)} e un riassunto per il resoconto.
@@ -598,7 +598,7 @@ def main():
     (out / "obs_fdda_end.txt").write_text(f"{minuti}\n")
     n3 = sum(1 for s in stazioni.values() if domini[3].contiene(s["lat"], s["lon"]))
     print(f"Scritte {sum(len(v) for v in testi.values())} osservazioni di {len(stazioni)} stazioni "
-          f"({n3} nel dominio a 3 km); nudging fino a +{minuti // 60} h {minuti % 60:02d} min "
+          f"({n3} nel dominio a 2 km); nudging fino a +{minuti // 60} h {minuti % 60:02d} min "
           f"({ultimo:%H:%M} UTC).")
 
 
