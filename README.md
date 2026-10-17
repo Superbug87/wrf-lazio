@@ -169,6 +169,7 @@ Le uscite del dominio a 3 km pesano circa tre volte quelle dei Castelli (stima: 
 | Modello | [WRF e WPS](https://www2.mmm.ucar.edu/wrf/users/public.html) di NCAR/UCAR | software pubblico, non incluso qui: lo compila il flusso di lavoro dai sorgenti ufficiali |
 | Terreno e uso del suolo | dati geografici [WPS_GEOG](https://www2.mmm.ucar.edu/wrf/users/download/get_sources_wps_geog.html) di NCAR/UCAR (tra cui GMTED2010 di USGS/NGA e MODIS) | scaricati durante il calcolo, non inclusi qui; vale la licenza di ciascun dato |
 | Confini regionali e provinciali | confini amministrativi ISTAT, elaborati da [Openpolis](https://github.com/openpolis/geojson-italy) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)) | semplificati (100 m) e ritagliati sull'area delle mappe in `dati/confini_lazio.json`; la fonte è citata a piè di mappa |
+| Laghi | contorni di [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors, [ODbL](https://opendatacommons.org/licenses/odbl/)) | specchi d'acqua di almeno 1 km², semplificati (50 m), in `dati/laghi_lazio.json`; la fonte è citata a piè di mappa |
 | Stazioni meteo | rete di stazioni amatoriali di [Weather Underground](https://www.wunderground.com/) (The Weather Company), tramite la chiave personale del proprietario | restano soggette ai termini d'uso di Weather Underground, da rispettare (la chiave è personale). I dati **non vengono ripubblicati**: si scaricano durante il calcolo, entrano in WRF e non finiscono nei risultati; i file temporanei che passano da un segmento all'altro sono cifrati; i log non riportano codici o posizioni delle stazioni; le mappe mostrano solo l'uscita del modello |
 | Solo per `previsioni_lazio.py` usato da solo | [Open-Meteo](https://open-meteo.com/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); l'API gratuita è per uso non commerciale) e quote dal modello digitale del terreno Copernicus DEM («contiene dati Copernicus modificati») | non usati dalla catena WRF |
 
@@ -216,3 +217,5 @@ per segmento, pagina del sito con dati veri. Le scelte fisiche (Kain-Fritsch a 9
 - `previsioni_lazio.py` — mappe e correzione con le stazioni (usato da `postprocess.py`)
 - `dati/confini_lazio.json` — confine del Lazio e confini provinciali disegnati sulle mappe (linea spessa il Lazio, più
   sottili le province) · `wrf/prepara_confini.py` — lo rifà dai confini ISTAT di Openpolis (serve solo se cambiano)
+- `dati/laghi_lazio.json` — contorni reali dei laghi (25, da 1 km² in su, isole comprese) · `wrf/prepara_laghi.py` — lo rifà
+  da OpenStreetMap tramite Overpass

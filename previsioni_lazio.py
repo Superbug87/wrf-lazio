@@ -45,7 +45,6 @@ import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap, to_rgb
-from matplotlib.patches import Ellipse
 from matplotlib.ticker import MaxNLocator
 from scipy.interpolate import RectBivariateSpline
 
@@ -72,12 +71,6 @@ PAESI = [   # città scritte sulle mappe di dettaglio e sulle orarie: posizioni 
     ("Frosinone", 41.640, 13.340),
     ("Terracina", 41.287, 13.249),
     ("Cassino", 41.490, 13.832),
-]
-LAGHI = [  # nome, lat, lon, raggio in gradi lat, raggio in gradi lon (schematici)
-    ("Bolsena", 42.595, 11.935, 0.062, 0.085),
-    ("Bracciano", 42.122, 12.228, 0.040, 0.054),
-    ("Vico", 42.320, 12.170, 0.022, 0.030),
-    ("Albano", 41.748, 12.667, 0.0126, 0.0169),
 ]
 LIVELLI_QUOTA = [500, 1000, 1500, 2000]      # linee grigie delle mappe (m)
 
@@ -632,6 +625,45 @@ def carica_confini():
     return _CONFINI
 
 
+_LAGHI = None
+FILE_LAGHI = Path(__file__).resolve().parent / "dati" / "laghi_lazio.json"
+
+
+def carica_laghi():
+    """Lista di laghi, ognuno (nome, anelli esterni, anelli interni/isole) come array (n, 2) lon/lat.
+    Il file lo fa wrf/prepara_laghi.py da OpenStreetMap; se manca le mappe escono senza laghi."""
+    global _LAGHI
+    if _LAGHI is None:
+        try:
+            d = json.loads(FILE_LAGHI.read_text(encoding="utf-8"))
+            _LAGHI = [(l["nome"], [np.array(a) for a in l["esterni"]], [np.array(a) for a in l["interni"]]) for l in d["laghi"]]
+        except (OSError, ValueError, KeyError) as e:
+            print(f"Laghi non disponibili ({FILE_LAGHI.name}: {e}): mappe senza laghi", file=sys.stderr)
+            _LAGHI = []
+    return _LAGHI
+
+
+def _verso(anello, antiorario):
+    """L'anello percorso in senso antiorario (o orario): serve perché le isole di un lago siano buchi."""
+    x, y = anello[:, 0], anello[:, 1]
+    area = 0.5 * float(np.sum(x[:-1] * y[1:] - x[1:] * y[:-1]))
+    return anello if (area > 0) == antiorario else anello[::-1]
+
+
+def disegna_laghi(ax, scala=1.0):
+    """I laghi con il loro contorno vero (isole comprese), azzurro con bordo blu."""
+    from matplotlib.patches import PathPatch
+    from matplotlib.path import Path as Percorso
+
+    for _nome, esterni, interni in carica_laghi():
+        v, c = [], []
+        for a, ant in [(a, True) for a in esterni] + [(a, False) for a in interni]:
+            a = _verso(a, ant)
+            v += [*a, a[0]]
+            c += [Percorso.MOVETO] + [Percorso.LINETO] * (len(a) - 1) + [Percorso.CLOSEPOLY]
+        ax.add_patch(PathPatch(Percorso(v, c), fc="#cde2fb", ec=BLU, lw=0.8 * scala, zorder=5))
+
+
 def disegna_confini(ax, scala=1.0):
     """Confine del Lazio (linea spessa), confini delle sue province (più sottile) e delle province vicine (sottile e grigia).
     `scala` assottiglia le linee nei riquadri piccoli."""
@@ -651,8 +683,7 @@ def decora(ax, z_f, lat_f, lon_f):
     disegna_confini(ax)
     ax.contour(lon_f, lat_f, z_f, levels=LIVELLI_QUOTA, colors=TENUE,
                linewidths=0.6, alpha=0.8, zorder=2)
-    for _, la, lo, rla, rlo in LAGHI:
-        ax.add_patch(Ellipse((lo, la), 2 * rlo, 2 * rla, fc="#cde2fb", ec=BLU, lw=0.8, zorder=5))
+    disegna_laghi(ax)
     for nome, la, lo in PAESI:
         ax.plot(lo, la, "o", ms=4, color=INK, mec=SFONDO, mew=0.8, zorder=7)
         ax.text(lo + 0.04, la, nome, fontsize=11, color=INK, va="center", zorder=7, path_effects=halo)
@@ -761,7 +792,8 @@ def disegna_mappe(c, z_f, lat_f, lon_f, k, tempi, titolo_banner, modello_txt, ou
     ]
     def testo_note(sigla):
         note = ["Linee scure: confine del Lazio (spessa) e confini provinciali (sottili); linee grigie chiare: quota ogni 500 m. "
-                "Laghi e posizioni delle città sono schematici. Confini: ISTAT, elaborati da Openpolis (CC BY 4.0).", modello_txt,
+                "Posizioni delle città approssimate. Confini: ISTAT, elaborati da Openpolis (CC BY 4.0). "
+                "Laghi: © OpenStreetMap contributors (ODbL).", modello_txt,
                 "Non sostituisce le previsioni ufficiali."]
         if sigla == "2/2":
             note.insert(1, "CAPE alto = ambiente favorevole ai temporali, non una certezza.")

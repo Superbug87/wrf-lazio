@@ -65,7 +65,7 @@ assert pc.LAT_MIN < 40.78 and pc.LAT_MAX > 42.85 and pc.LON_MIN < 11.45 and pc.L
 print("mappe e dominio ok")
 EOF
 
-passo "confini del Lazio e delle province: le città del Lazio dentro, quelle vicine fuori, cinque province"
+passo "confini del Lazio e delle province, laghi veri: le città del Lazio dentro, quelle vicine fuori, cinque province, laghi con superficie e centro giusti"
 python3 - <<'EOF'
 import json, sys
 sys.path.insert(0, ".")
@@ -93,6 +93,21 @@ spessori = sorted({round(l.get_linewidth(), 1) for l in ax.lines})
 assert spessori == [0.7, 1.0, 2.6], spessori
 assert sum(1 for l in ax.lines if round(l.get_linewidth(), 1) == 2.6) == 1, "il confine spesso è solo la terraferma"
 print("confini ok:", len(d["regione"]), "anelli del Lazio,", len(d["province"]), "province, linee", spessori)
+# laghi veri: Bolsena, Bracciano, Vico e Albano contengono il loro centro e hanno la superficie giusta (km²)
+laghi = json.load(open("dati/laghi_lazio.json"))
+assert "OpenStreetMap" in laghi["fonte"]
+attesi = {"Lago di Bolsena": ((42.595, 11.935), 100, 130), "Lago di Bracciano": ((42.122, 12.228), 50, 65),
+          "Lago di Vico": ((42.320, 12.170), 10, 14), "Lago Albano": ((41.748, 12.667), 5, 7)}
+for l in laghi["laghi"]:
+    if l["nome"] in attesi:
+        (la, lo), amin, amax = attesi.pop(l["nome"])
+        assert amin <= l["area_km2"] <= amax, (l["nome"], l["area_km2"])
+        assert any(Path(np.array(a)).contains_point((lo, la)) for a in l["esterni"]), l["nome"] + ": centro fuori dal contorno"
+assert not attesi, "laghi mancanti: " + ", ".join(attesi)
+fig, ax = plt.subplots()
+pc.disegna_laghi(ax)
+assert len(ax.patches) == len(laghi["laghi"]), (len(ax.patches), len(laghi["laghi"]))
+print("laghi ok:", len(laghi["laghi"]), "laghi veri (niente cerchi)")
 EOF
 
 passo "file met_em fatti come quelli di metgrid 4.7 (livelli letti dalla dimensione e dall'attributo)"
