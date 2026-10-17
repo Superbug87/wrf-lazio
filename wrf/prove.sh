@@ -108,6 +108,23 @@ fig, ax = plt.subplots()
 pc.disegna_laghi(ax)
 assert len(ax.patches) == len(laghi["laghi"]), (len(ax.patches), len(laghi["laghi"]))
 print("laghi ok:", len(laghi["laghi"]), "laghi veri (niente cerchi)")
+# vento: linee di flusso continue con tante freccette (prima 100 frecce corte), il verso è quello del vento
+lon_f = np.linspace(pc.LON_MIN, pc.LON_MAX, 80); lat_f = np.linspace(pc.LAT_MIN, pc.LAT_MAX, 80)
+LON, LAT = np.meshgrid(lon_f, lat_f)
+u = 5.0 + 3 * np.sin((LAT - 41) * 3) + 0 * LON
+v = 2.0 + 3 * np.cos((LON - 12) * 3)
+fig, ax = plt.subplots()
+ax.set_xlim(pc.LON_MIN, pc.LON_MAX); ax.set_ylim(pc.LAT_MIN, pc.LAT_MAX)
+pc.disegna_flusso(ax, lon_f, lat_f, u, v, densita=1.8)
+tri = [c for c in ax.collections if c.__class__.__name__ == "PolyCollection"]
+linee = [c for c in ax.collections if c.__class__.__name__ == "LineCollection"]
+n_tri = sum(len(c.get_paths()) for c in tri)
+assert n_tri >= 400, n_tri
+assert sum(len(c.get_paths()) for c in linee) >= 60
+# il verso: la punta di ogni freccetta guarda dove soffia il vento (u > 0 qui: verso est)
+punte = [p.vertices[0][0] - p.vertices[1:3, 0].mean() for p in tri[0].get_paths()]
+assert np.mean(np.array(punte) > 0) > 0.95, "le freccette non guardano verso il vento"
+print("vento ok:", n_tri, "freccette lungo", sum(len(c.get_paths()) for c in linee), "linee di flusso")
 EOF
 
 passo "file met_em fatti come quelli di metgrid 4.7 (livelli letti dalla dimensione e dall'attributo)"

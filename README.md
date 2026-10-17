@@ -155,6 +155,10 @@ Le uscite del dominio a 3 km pesano circa tre volte quelle dei Castelli (stima: 
   `ungrib` non legge la compressione CCSDS di ECMWF. Gli strati di suolo, numerati da 1 a 4, diventano
   profondità in cm (0-7, 7-28, 28-100, 100-289) e l'orografia dell'ora 0 è copiata in tutte le ore.
 - Le mappe mostrano una stella per Velletri (il valore scritto in basso a destra di ogni riquadro) e le città principali.
+- **Il vento è disegnato come linee di flusso** (come le carte di Meteociel): linee continue sottili con tante freccette
+  piene lungo la linea (una ogni ~18 km) che danno il verso, oltre 100 linee e più di 600 freccette nelle immagini orarie (prima
+  erano 100 frecce corte). Le tessere da 6 ore sono meno fitte. Il colore sotto resta la velocità del vento. Si regola con
+  `densita` in `disegna_flusso()` (`previsioni_lazio.py`).
 - Il bordo del dominio a 3 km è a 25 km o più dalle mappe, ma le celle vicino al bordo del nido sono comunque influenzate
   dal dominio a 9 km: non fidarsi troppo dei dettagli ai margini della mappa.
 - Non sostituisce le previsioni ufficiali.
