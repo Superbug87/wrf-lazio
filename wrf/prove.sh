@@ -91,6 +91,7 @@ fig, ax = plt.subplots()
 pc.disegna_confini(ax)
 spessori = sorted({round(l.get_linewidth(), 1) for l in ax.lines})
 assert spessori == [0.7, 1.0, 2.6], spessori
+assert sum(1 for l in ax.lines if round(l.get_linewidth(), 1) == 2.6) == 1, "il confine spesso è solo la terraferma"
 print("confini ok:", len(d["regione"]), "anelli del Lazio,", len(d["province"]), "province, linee", spessori)
 EOF
 

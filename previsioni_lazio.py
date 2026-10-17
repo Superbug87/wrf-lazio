@@ -614,32 +614,36 @@ FILE_CONFINI = Path(__file__).resolve().parent / "dati" / "confini_lazio.json"
 
 
 def carica_confini():
-    """(anelli del Lazio, anelli delle province del Lazio, anelli delle altre province) come array (n, 2) lon/lat.
+    """(terraferma del Lazio, isole del Lazio, province del Lazio, altre province) come liste di anelli, array (n, 2) lon/lat.
     Il file lo fa wrf/prepara_confini.py dai confini ISTAT; se manca le mappe escono senza confini."""
     global _CONFINI
     if _CONFINI is None:
         try:
             d = json.loads(FILE_CONFINI.read_text(encoding="utf-8"))
-            reg = [np.array(a) for a in d["regione"]]
+            anelli = [np.array(a) for a in d["regione"]]
+            anelli.sort(key=lambda a: -np.ptp(a[:, 0]) * np.ptp(a[:, 1]))     # il primo è la terraferma
+            reg, isole = anelli[:1], anelli[1:]
             nel = [np.array(a) for p in d["province"] if p["regione"] == "Lazio" for a in p["anelli"]]
             fuori = [np.array(a) for p in d["province"] if p["regione"] != "Lazio" for a in p["anelli"]]
-            _CONFINI = (reg, nel, fuori)
+            _CONFINI = (reg, isole, nel, fuori)
         except (OSError, ValueError, KeyError) as e:
             print(f"Confini non disponibili ({FILE_CONFINI.name}: {e}): mappe senza confini", file=sys.stderr)
-            _CONFINI = ([], [], [])
+            _CONFINI = ([], [], [], [])
     return _CONFINI
 
 
 def disegna_confini(ax, scala=1.0):
     """Confine del Lazio (linea spessa), confini delle sue province (più sottile) e delle province vicine (sottile e grigia).
     `scala` assottiglia le linee nei riquadri piccoli."""
-    reg, nel, fuori = carica_confini()
+    reg, isole, nel, fuori = carica_confini()
     for a in fuori:
         ax.plot(a[:, 0], a[:, 1], color=SEC, lw=0.7 * scala, alpha=0.75, zorder=3, solid_joinstyle="round")
     for a in nel:
         ax.plot(a[:, 0], a[:, 1], color=INK, lw=1.0 * scala, alpha=0.85, zorder=3.5, solid_joinstyle="round")
     for a in reg:
         ax.plot(a[:, 0], a[:, 1], color=INK, lw=2.6 * scala, zorder=4, solid_joinstyle="round", solid_capstyle="round")
+    for a in isole:                                       # le isole pontine: linea fina, come le province
+        ax.plot(a[:, 0], a[:, 1], color=INK, lw=1.0 * scala, zorder=4, solid_joinstyle="round")
 
 
 def decora(ax, z_f, lat_f, lon_f):
