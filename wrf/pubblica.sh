@@ -2,7 +2,8 @@
 # Pubblica le immagini nel ramo "risultati" del repository:
 #   ultimo/            i fogli di sintesi dell'ultima previsione
 #   archivio/<ciclo>/  i fogli degli ultimi 28 cicli
-#   orarie/            una immagine per ora e variabile degli ultimi 2 cicli + indice.json (lo legge la pagina del sito)
+#   orarie/            una immagine per ora e variabile degli ultimi 14 cicli (una settimana, ~14 MB l'uno) + indice.json
+#                      (ultimo ciclo) + cicli.json (elenco dei cicli presenti): li legge la pagina del sito
 # Il ramo viene riscritto con un solo commit a ogni pubblicazione: la storia non si accumula (le immagini pesano).
 # Uso: pubblica.sh CARTELLA_IMMAGINI CICLO
 set -euo pipefail
@@ -19,10 +20,23 @@ cp "$IMG"/*.png "archivio/$CICLO/"
 cp "$IMG"/*.csv "archivio/$CICLO/" 2>/dev/null || true       # statistiche del confronto con il radar, solo nell'archivio
 if [ -f "$IMG/orarie/indice.json" ]; then
   mkdir -p orarie
+  # i cicli pubblicati prima dell'elenco dei cicli non hanno il proprio indice: quello generale e' il loro (se e' dello stesso ciclo)
+  if [ -f orarie/indice.json ]; then
+    C=$(python3 -c "import json; print(json.load(open('orarie/indice.json')).get('ciclo', ''))" 2>/dev/null || true)
+    if [ -n "$C" ] && [ -d "orarie/$C" ] && [ ! -f "orarie/$C/indice.json" ]; then cp orarie/indice.json "orarie/$C/indice.json"; fi
+  fi
   for d in "$IMG"/orarie/*/; do rm -rf "orarie/$(basename "$d")"; cp -r "$d" "orarie/$(basename "$d")"; done
   cp "$IMG/orarie/indice.json" orarie/indice.json
-  # si tengono i 2 cicli piu' recenti: chi ha ancora in memoria il vecchio indice non trova immagini sparite
-  ls -1d orarie/*/ 2>/dev/null | sort | head -n -2 | xargs -r rm -rf
+  # cartelle di cicli senza indice (non si possono scegliere dalla pagina): via
+  for d in orarie/*/; do [ -f "${d}indice.json" ] || rm -rf "$d"; done
+  # si tiene una settimana: 14 cicli (due al giorno). I piu' vecchi spariscono.
+  ls -1d orarie/*/ 2>/dev/null | sort | head -n -14 | xargs -r rm -rf
+  # elenco dei cicli presenti, dal piu' recente: lo legge la pagina del sito per scegliere il run
+  python3 - <<'PY'
+import json, os
+cicli = sorted((d for d in os.listdir("orarie") if os.path.isfile(f"orarie/{d}/indice.json")), reverse=True)
+json.dump({"cicli": cicli}, open("orarie/cicli.json", "w"))
+PY
 fi
 {
   PIL=${PILOTA:-ecmwf}; echo "# Ultima previsione WRF — ciclo ${PIL^^} ${CICLO:0:8} ${CICLO:8:2}Z"
